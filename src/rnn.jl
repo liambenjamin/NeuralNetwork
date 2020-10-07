@@ -67,11 +67,14 @@ function rnnNeurons(feat_dim, hid_dim, seq_length, output_dim, seed; kwargs...)
 	id = 1
 	for i=1:seq_length
 		for j=1:hid_dim
-			neurons[id] = sigmoid.init(id, u_l+hid_dim, u_l+hid_dim+1)
+			#neurons[id] = sigmoid.init(id, u_l+hid_dim, u_l+hid_dim+1)
+			neurons[id] = hypertan.init(id, u_l+hid_dim, u_l+hid_dim+1)
 			id += 1
 		end
 	end
-	neurons[id:end] = map(i -> sigmoid.init(i, hid_dim, hid_dim+1), id:length(neurons))
+	#neurons[id:end] = map(i -> sigmoid.init(i, hid_dim, hid_dim+1), id:length(neurons))
+	# linear activation b/t Xτ and output
+	neurons[id:end] = map(i -> linear.init(i, hid_dim, hid_dim+1), id:length(neurons))
 
     return neurons
 end
@@ -87,7 +90,7 @@ function graphIndex(feat_ind, state_ind, hid_dim, output_dim)
 	# RNN neurons
 	for i=1:length(feat_ind)
 		for j=1:hid_dim
-			append!(graph_index, [vcat(feat_ind[i][1]:feat_ind[i][2], state_ind[ct])])
+			append!(graph_index, [vcat(state_ind[ct], feat_ind[i][1]:feat_ind[i][2])])
 			ct += 1
 		end
 	end
