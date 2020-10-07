@@ -271,7 +271,9 @@ function load_mnist()
 	test_set = CSV.File("../data/mnist/mnist_test.csv", header=false)
 
 	train_x = map(i -> train_set[i][2:end] ./ 255, 1:length(train_set)) # normalize pixels to (0,1)
+	train_x = map(i -> collect(Iterators.flatten(reshape(train_x[i], 28,28)')), 1:length(train_x))
 	test_x = map(i -> test_set[i][2:end]./ 255, 1:length(test_set)) # normalize pixels to (0,1)
+	test_x = map(i -> collect(Iterators.flatten(reshape(test_x[i], 28,28)')), 1:length(test_x))
 	train_y = map(i -> train_set[i][1], 1:length(train_set))
 	test_y = map(i -> test_set[i][1], 1:length(test_set))
 	train_y = one_hot(train_y) # one hot labels
@@ -291,18 +293,40 @@ function mnist_test_error(network, features, labels, ntwk_type :: String)
 	network.results != size(labels, 2) && @error "Prediction and true label are different dimensions."
 
 	N = length(features)
-	num_correct = zeros(N)
+	num_correct = 0
 	x0 = ntwk_type == "lstm" ? 2*network.hid_dim : network.hid_dim
 
 	for i=1:N
 		U, label = features[i], labels[i,:]
 		# append initial hidden state (zero vector)
 		U = vcat(U, zeros(x0))
-		pred = Network.evaluate(network, U)[end-network.results+1:end]
-		Y = findmax(pred)[2]
-		num_correct[i] = Y == findmax(label)[2] ? 1 : 0 ;
+		X = Network.evaluate(network, U)[end-network.results+1:end]
+		Z = exp.(X .- maximum(X))
+		pred = Z / sum(Z)
+		findmax(pred)[2] == findmax(label)[2] ? num_correct += 1 : num_correct += 0 ;
    end
-   return 1.0 - (sum(num_correct) / N)
+   return 1.0 - num_correct/N
+end
+
+"""
+Set ntwk parameters to saved tf params
+"""
+function set_rnn_params(ntwk, partition, w_rec, w_rec_bias, w_out, w_out_bias)
+
+	# recurrent paramaters
+	for i=1:ntwk.hid_dim #20
+		for j=1:ntwk.seq_length # 28
+			id = partition[i][j]
+			ntwk.neurons[id].β = vcat(w_rec_bias[i], w_rec[:,i])
+		end
+	end
+	ct = 1
+	for i=ntwk.hid_dim+1:length(partition)
+		id = partition[i][]
+		ntwk.neurons[id].β = vcat( w_out_bias[ct], w_out[:,ct])
+		ct += 1
+	end
+	return ntwk
 end
 
 end # end module
