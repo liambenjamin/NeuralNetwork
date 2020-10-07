@@ -145,7 +145,7 @@ function evaluate(L :: Vector, inp_dim :: Int64, hid_dim :: Int64, seq_length ::
         -norm(λ_star) / (norm(Λ[:,T][i])*(1+log(norm(λ_star)^2))) + 1 :
         # ϕ2
         log(norm(λ_star)*norm(Λ[:,T][i])) / (1+log(norm(λ_star)^2)), 1:d)
-    return 1e-2 * ((sum( nrms.^2)/T - M^2) + 20 * sum(ϕ))
+    return 1e-1 * ((sum( nrms.^2)/T - M^2) + sum(ϕ))
 end
 
 function gradient(L :: Vector, inp_dim :: Int64, hid_dim :: Int64, seq_length :: Int64, ntwk_type :: String)
@@ -169,11 +169,11 @@ function gradient(L :: Vector, inp_dim :: Int64, hid_dim :: Int64, seq_length ::
         (norm(λ_star)*Λ[:,T][i]) / (norm(Λ[:,T][i])^3 * (1+log(norm(λ_star)^2))) :
         # ϕ'2
         (norm(λ_star)*Λ[:,T][i]) / (norm(λ_star) * (1+log(norm(λ_star)^2)) * norm(Λ[:,T][i])^2), 1:d)
-    val[:,T] = nrms[T] == 0 ? zeros(d) : val[:,T] + 20 * ∂ϕ
+    val[:,T] = nrms[T] == 0 ? zeros(d) : val[:,T] + ∂ϕ
     # append vector to adjoint vector
     grad = zeros(length(L))
     grad[X_pos] = collect(Iterators.flatten(val))
-    return 1e-2 * grad
+    return 1e-1 * grad
 end
 
 end #end var_phi module
