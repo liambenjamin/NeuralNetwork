@@ -87,8 +87,11 @@ function lstmNeurons(feat_dim, hid_dim, seq_length, output_dim, seed)
 	for i=1:seq_length
 		for j=1:6
 			for k=1:hid_dim
-				if j <= 4
+				if j < 4
 					neurons[id] = sigmoid.init(id, u_l+hid_dim, u_l+hid_dim+1)
+					id += 1
+				elseif j == 4
+					neurons[id] = hypertan.init(id, u_l+hid_dim, u_l+hid_dim+1)
 					id += 1
 				elseif j == 5
 					neurons[id] = lstmCellState.init(id, 4, 4+1)
@@ -101,7 +104,9 @@ function lstmNeurons(feat_dim, hid_dim, seq_length, output_dim, seed)
 		end
 	end
 
-	neurons[id:end] = map(i -> sigmoid.init(i, hid_dim, hid_dim+1), id:length(neurons))
+	output_dim > 1 ?
+		neurons[id:end] = map(i -> linear.init(i, hid_dim, hid_dim+1), id:length(neurons)) :
+		neurons[id:end] = map(i -> sigmoid.init(i, hid_dim, hid_dim+1), id:length(neurons))
 
     return neurons
 end

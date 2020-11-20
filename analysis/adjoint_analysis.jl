@@ -1,50 +1,65 @@
-# set directory to file location
-cd("Desktop/NN_Implementation/training/opt_ntwks/")
+include("../src/neurons.jl")
+include("../src/network.jl")
+include("../src/partition.jl")
+include("../src/rnn.jl")
+include("../src/gru.jl")
+include("../src/lstm.jl")
+include("../src/helpers.jl")
+include("../src/penalties.jl")
+#include("plot.jl")
 
-include("../../src/neurons.jl")
-include("../../src/network.jl")
-include("../../src/partition.jl")
-include("../../src/penalties.jl")
-include("../../src/helpers.jl")
+using FileIO, Statistics, MultivariateStats, LinearAlgebra, SparseArrays, Main.Neurons, MLDatasets, Random, Main.Neurons, Main.Network, Main.loss, Main.penalty, Main.Helpers, Main.Partition, Main.RNN, Main.LSTM, Main.GRU
 
-using JLD, Plots, SparseArrays, LinearAlgebra
-
-
-function ntwk_summary(loss :: Module, penalty :: Module)
-    info_layer = 5
-    n_train = 4000
-    N = 1
-    num_ntwks = length(1:N)
-    F = zeros(num_ntwks)
-    Λ = zeros(50, num_ntwks)
-
-    for i=1:num_ntwks
-        ntwk = load("layer_5/toy_adjoint_5_2.jld", "ntwk")
-        for j=1:n_train
-            # find loss
-            U, label = randn(1,10), zeros(ntwk.results)
-            if sum(U[:,info_layer]) > 0
-                label[1] = 1.0
-            else
-                label[2] = 1.0
-            end
-            U = collect(Iterators.flatten(U))
-            U = vcat(U, zeros(ntwk.hid_dim))
-            X = Network.evaluate(ntwk, U)
-            λ = Network.adjoint(ntwk, X, label, loss)
-            F[i] += loss.evaluate(label, X, ntwk.results)
-            Λ[:,i] += λ[16:end-2*ntwk.results]
-        end
-    end
-    return F ./ n_train, Λ ./ n_train
-end
-
-lsmod = loss.crossEntropy
+# load network, loss and penalty
+printstyled("Loading Network:", color=:yellow)
+ntwk = load("mnist3/rnn_adjoint_1.jld2", "ntwk")
+lsmod = loss.softmaxCrossEntropy
 pnmod = penalty.var_phi
-F, Λ = ntwk_summary(lsmod, pnmod)
-F_co, Λ_co = ntwk_summary(lsmod, pnmod)
-L = map(i -> reshape(Λ[:,i],5,10), 1:size(Λ,2))
-# remove networks that did not converge to minimizer
-ind = findall(x -> x < 0.54, F)
-F = F[ind]
-Λ = L[ind]
+partition = load("mnist3/rnn_partition.jld2", "partition")
+printstyled("\tCOMPLETE\n", color=:yellow)
+printstyled("Loading Test Data:", color=:yellow)
+test_x, test_y = Helpers.load_mnist_test()
+printstyled("\tCOMPLETE\n\n", color=:yellow)
+
+# MNIST
+N = 500
+printstyled("Computing gradient matrices over $(N) test features:\n\n", color=:yellow)
+printstyled("\t∇uᵢ where i ∈ {1,7,14,21,28}", color=:yellow)
+test_x, test_y = test_x[1:500], test_y[1:500,:] # trim dataset to first 100 samples
+dU1 = Helpers.input_element_grad(ntwk, lsmod, pnmod, test_x, test_y, partition, "adjoint", "rnn", 1)
+dU7 = Helpers.input_element_grad(ntwk, lsmod, pnmod, test_x, test_y, partition, "adjoint", "rnn", 7)
+dU14 = Helpers.input_element_grad(ntwk, lsmod, pnmod, test_x, test_y, partition, "adjoint", "rnn", 14)
+dU21 = Helpers.input_element_grad(ntwk, lsmod, pnmod, test_x, test_y, partition, "adjoint", "rnn", 21)
+dU28 = Helpers.input_element_grad(ntwk, lsmod, pnmod, test_x, test_y, partition, "adjoint", "rnn", 28)
+printstyled("\t\tCOMPLETE\n\n",color=:yellow)
+printstyled("Performing PCA on gradient matrices:")
+P1 = fit(PCA, dU1, method=:cov)
+P7 = fit(PCA, dU7, method=:cov)
+P14 = fit(PCA, dU14, method=:cov)
+P21 = fit(PCA, dU21, method=:cov)
+P28 = fit(PCA, dU28, method=:cov)
+printstyled("\tCOMPLETE\n\n", color=:yellow)
+
+printstyled("Results for PCA on ∇u1:\n", color=:magenta)
+printstyled("\t\tout dimension:\t$(outdim(P1))\n",color=:magenta)
+printstyled("\t\tvariance of principal components:\t$(principalvars(P1))\n\n\n",color=:magenta)
+
+printstyled("Results for PCA on ∇u7:\n", color=:magenta)
+printstyled("\t\tout dimension:\t$(outdim(P7))\n",color=:magenta)
+printstyled("\t\tvariance of principal components:\t$(principalvars(P7))\n\n\n",color=:magenta)
+
+printstyled("Results for PCA on ∇u14:\n", color=:magenta)
+printstyled("\t\tout dimension:\t$(outdim(P14))\n",color=:magenta)
+printstyled("\t\tvariance of principal components:\t$(principalvars(P14))\n\n\n",color=:magenta)
+
+printstyled("Results for PCA on ∇u21:\n", color=:magenta)
+printstyled("\t\tout dimension:\t$(outdim(P21))\n",color=:magenta)
+printstyled("\t\tvariance of principal components:\t$(principalvars(P21))\n\n\n",color=:magenta)
+
+printstyled("Results for PCA on ∇u28:\n", color=:magenta)
+printstyled("\t\tout dimension:\t$(outdim(P28))\n",color=:magenta)
+printstyled("\t\tvariance of principal components:\t$(principalvars(P28))\n\n\n",color=:magenta)
+
+function perturb_input(train_x, G :: )
+
+function perturb_test()

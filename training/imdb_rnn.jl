@@ -18,12 +18,16 @@ function train(ntwk, loss :: Module, penalty :: Module, η :: Float64, num_epoch
 	                    "Time" => zeros(num_epochs), "Error" => zeros(num_epochs), "Λ_init" => zeros(num_epochs),
 	                    "Λ_out" => zeros(num_epochs))
 
-    test_x = npzread("data/test_imdb_dat_1.npz")
-    test_y = npzread("data/test_imdb_label1.npz")
+	data = npzread("imdb-params/keras-rnn-imdb-data.npz")
+	train_x, train_y = data["train_x"], data["train_y"]
+	test_x, test_y = data["test_x"], data["test_y"]
+
+    #test_x = npzread("data/test_imdb_dat_1.npz")
+    #test_y = npzread("data/test_imdb_label1.npz")
 
 	# initialize adam running exponential average vars
 	m, v = Helpers.adam_init(ntwk, syncFlag, partition)
-	batch_size = 20
+	batch_size = 64
 	N_samp = 25000
 
     for i=1:num_epochs

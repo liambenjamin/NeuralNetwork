@@ -1,14 +1,15 @@
 # set directory to file location
-cd("Desktop/NN_Implementation/training/opt_ntwks/")
+#cd("Desktop/NN_Implementation/training//")
 
-include("../../src/neurons.jl")
-include("../../src/network.jl")
-include("../../src/partition.jl")
-include("../../src/penalties.jl")
-include("../../src/helpers.jl")
+include("../src/neurons.jl")
+include("../src/network.jl")
+include("../src/partition.jl")
+include("../src/penalties.jl")
+include("../src/helpers.jl")
 
-using JLD, Plots, SparseArrays, LinearAlgebra, CSV, DataFrames
+using JLD2, PyPlot, SparseArrays, LinearAlgebra, CSV, DataFrames, FileIO, MLDatasets
 
+#=
 """
 Linear Interpolation of Loss Surface
 θ = (1-α) × θι + α × θɾ
@@ -150,58 +151,74 @@ CSV.write("J3.csv",  dfJ, writeheader=false)
 
 
 function twoSimplex(N :: Int64)
-	κ = 2.0 / (N-1)
-	mesh = 0:κ:2.0
+	κ = 1.25 / (N-1)
+	mesh = 0:κ:1.25
 	grid = Iterators.collect(Iterators.product(mesh, mesh))
 
 	return grid
 end
 
-function F_simplex(adj_ntwk, coadj_ntwk, init_ntwk, loss :: Module, simplex, info_layer :: Int64)
+function F_simplex(adj_ntwk, coadj_ntwk, init_ntwk, loss :: Module, simplex)
+
+	# load MNIST data
+	train_x, train_y = MNIST.traindata()
+	test_x,  test_y  = MNIST.testdata()
+	# reshape features and one-hot encode labels
+	train_x = map(i -> collect(Iterators.flatten(train_x[:,:,i])), 1:size(train_x,3))
+	test_x = map(i -> collect(Iterators.flatten(test_x[:,:,i])), 1:size(test_x,3))
+	train_y, test_y = Helpers.one_hot(train_y), Helpers.one_hot(test_y)
+
 	ntwk = deepcopy(adj_ntwk)
 	L = length(ntwk.neurons)
-	F = zeros(size(simplex))
-	N = 5000
+	#F = zeros(size(simplex))
+	F_test = zeros(size(simplex))
+	F_train = zeros(size(simplex))
+	test_error = zeros(size(simplex))
+	train_error = zeros(size(simplex))
+
+	#N = 500
 
 	for i=1:size(simplex,1)
 		for k=1:size(simplex,2)
-			i_coor = 2.0 - simplex[i,k][1] - simplex[i,k][2]
-			for j=1:L
-				ntwk.neurons[j].β = (simplex[i,k][1]*adj_ntwk.neurons[j].β) + (simplex[i,k][2]*coadj_ntwk.neurons[j].β) + (i_coor*init_ntwk.neurons[j].β)
-			end
-
-			for j=1:N
-				U, label = randn(1,10), zeros(ntwk.results)
-				if sum(U[:,info_layer]) > 0
-					label[1] = 1.0
-				else
-					label[2] = 1.0
+			i_coor = 1.25 - simplex[i,k][1] - simplex[i,k][2]
+			if i_coor <= 1.25
+				for j=1:L
+					ntwk.neurons[j].β = (simplex[i,k][1]*adj_ntwk.neurons[j].β) + (simplex[i,k][2]*coadj_ntwk.neurons[j].β) + (i_coor*init_ntwk.neurons[j].β)
 				end
-				U = collect(Iterators.flatten(U))
-				U = vcat(U, zeros(ntwk.hid_dim))
-				X = Network.evaluate(ntwk, U)
-				Λ = Network.adjoint(ntwk, X, label, lsmod)
-				F[i,k] += lsmod.evaluate(label, X, ntwk.results) / N
+
+				F_test[i,k], test_error[i,k] = Helpers.mnist_test_error(ntwk, test_x[1:300], test_y[1:300,:], loss, "rnn")
+				F_train[i,k], train_error[i,k] = Helpers.mnist_test_error(ntwk, train_x[1:300], train_y[1:300,:], loss, "rnn")
 			end
 		end
 	end
 
-	return F
+	return F_test, F_train, test_error, train_error
 end
 
 
-s = twoSimplex(6)
-lsmod = loss.crossEntropy
-seeds = 1
-function writeDataToFile(seeds)
+
+dir = "mnist"
+
+#s = twoSimplex(21)
+
+lsmod = loss.softmaxCrossEntropy
+seeds = [1,2]
+
+function writeDataToFile(seeds, loss :: Module, simplex)
 	N = length(seeds)
 	for i=1:N
-		adj_ntwk = load("toy_exp/rnn_adjoint_2_$(seeds[i])_50.jld", "ntwk")
-		coadj_ntwk = load("toy_exp/rnn_coadjoint_2_$(seeds[i])_50.jld", "ntwk")
-		init_ntwk = load("toy_exp/rnn_init_2_$(seeds[i]).jld", "ntwk")
-		F = F_simplex(adj_ntwk, coadj_ntwk, init_ntwk, lsmod, s, 1)
-		dfJ = DataFrame(F)
-		CSV.write("layer_1/J_$(seeds[i]).csv",  dfJ, writeheader=false)
+		adj_ntwk = load("$(dir)/rnn_adjoint_5.jld2", "ntwk")
+		coadj_ntwk = load("$(dir)/rnn_coadjoint_1e$(seeds[i])_5.jld2", "ntwk")
+		init_ntwk = load("$(dir)/rnn_random_init.jld2", "ntwk")
+		F_test, F_train, test_error, train_error = F_simplex(adj_ntwk, coadj_ntwk, init_ntwk, lsmod, simplex)
+		dfF_test = DataFrame(F_test)
+		dfF_train = DataFrame(F_train)
+		dfE_test = DataFrame(test_error)
+		dfE_train = DataFrame(train_error)
+		CSV.write("$(dir)/JF_test_1e$(i).csv",  dfF_test, writeheader=false)
+		CSV.write("$(dir)/JF_train_1e$(i).csv",  dfF_train, writeheader=false)
+		CSV.write("$(dir)/JE_test_1e$(i).csv",  dfE_test, writeheader=false)
+		CSV.write("$(dir)/JE_train_1e$(i).csv",  dfE_train, writeheader=false)
 		if i == 1
 			printstyled("\t\tProcess:\t...\t$(round(i/N*100,digits=2))%", color=:green)
 		elseif i == N
@@ -212,4 +229,109 @@ function writeDataToFile(seeds)
 	end
 end
 
-writeDataToFile(seeds)
+writeDataToFile(seeds, lsmod, s)
+=#
+
+
+"""
+Bilinear Interpolation between three points
+ - Max = 1.00
+"""
+
+function simplex_3pt(N :: Integer)
+	u = collect(0:(1/N):1.0)
+	v = reverse(u)
+	C = collect(Iterators.product(u,u))
+	for i in CartesianIndices(C)
+		if sum(C[i]) > 1.0
+			C[i] = (NaN, NaN)
+		end
+	end
+	return C
+end
+
+
+function F_simplex(adj_ntwk, coadj_ntwk, init_ntwk, loss :: Module, simplex)
+
+	# load MNIST data
+	train_x, train_y = MNIST.traindata()
+	test_x,  test_y  = MNIST.testdata()
+	# reshape features and one-hot encode labels
+	train_x = map(i -> collect(Iterators.flatten(train_x[:,:,i])), 1:size(train_x,3))
+	test_x = map(i -> collect(Iterators.flatten(test_x[:,:,i])), 1:size(test_x,3))
+	train_y, test_y = Helpers.one_hot(train_y), Helpers.one_hot(test_y)
+
+	ntwk = deepcopy(adj_ntwk)
+	L = length(ntwk.neurons)
+	#F = zeros(size(simplex))
+	F_test = zeros(size(simplex))
+	F_train = zeros(size(simplex))
+	test_error = zeros(size(simplex))
+	train_error = zeros(size(simplex))
+
+	for i=1:size(simplex,1)
+		for k=1:size(simplex,2)
+
+			u, v = simplex[i,k]
+			if sum([u,v]) != NaN
+				for j=1:L
+					ntwk.neurons[j].β = u*adj_ntwk.neurons[j].β + v*coadj_ntwk.neurons[j].β + (1.0-u-v)*init_ntwk.neurons[j].β
+				end
+
+				F_test[i,k], test_error[i,k] = Helpers.mnist_test_error(ntwk, test_x[1:300], test_y[1:300,:], loss, "rnn")
+				F_train[i,k], train_error[i,k] = Helpers.mnist_test_error(ntwk, train_x[1:300], train_y[1:300,:], loss, "rnn")
+			end
+		end
+	end
+
+	return F_test, F_train, test_error, train_error
+end
+
+
+
+C = simplex_3pt(20)
+dir = "mnist"
+lsmod = loss.softmaxCrossEntropy
+adj_ntwk = load("$(dir)/rnn_adjoint_5.jld2", "ntwk")
+coadj_ntwk = load("$(dir)/rnn_coadjoint_1e1_5.jld2", "ntwk")
+init_ntwk = load("$(dir)/rnn_random_init.jld2", "ntwk")
+F_test, F_train, test_error, train_error = F_simplex(adj_ntwk, coadj_ntwk, init_ntwk, lsmod, C)
+
+CSV.write("$(dir)/F_test_1e1.csv",  DataFrame(F_test), writeheader=false)
+CSV.write("$(dir)/F_train_1e1.csv",  DataFrame(F_train), writeheader=false)
+CSV.write("$(dir)/E_test_1e1.csv",  DataFrame(test_error), writeheader=false)
+CSV.write("$(dir)/E_train_1e1.csv",  DataFrame(train_error), writeheader=false)
+
+
+F_test_flat = collect(Iterators.flatten(F_test))
+x = []
+y = []
+z = []
+for i=1:length(C)
+	if isnan(sum(C[i]))
+		nothing
+	else
+		append!(x, C[i][1])
+		append!(y, C[i][2])
+		append!(z, F_test_flat[i])
+		#x[i] = C[i][1]
+		#y[i] = C[i][2]
+		#z[i] = F_test_flat[i]
+	end
+end
+
+#surface(x,y,z, camera=(-30,30))
+
+index = [1,6,21] # init, adj, coad
+df = hcat(x,y,z)
+lab_x = df[index,1]
+lab_y = df[index,2]
+lab_z = df[index,3]
+
+plot(x,y,z, title="Linear Interpolation")
+
+surface(x,y,z, title="Linear Interpolation", camera=(60,30))
+
+
+scatter(lab_x,lab_y,lab_z, label="")
+annotate!(lab_x[1],lab_y[1],lab_z[1], "init")

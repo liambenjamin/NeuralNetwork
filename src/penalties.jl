@@ -1,19 +1,19 @@
 #Author: Liam Johnston
 #Date: June 3, 2020
 #Description: Functions used during training of neural networks
-include("rnn.jl")
-include("lstm.jl")
-include("gru.jl")
+#include("rnn.jl")
+#include("lstm.jl")
+#include("gru.jl")
 
 module loss
 
 # Note 1: `label` is true label (vector or scalar)
 # Note 2: `X` where `X[end-output_dim+1:end]` is the network's prediction
 
-export ltwo, crossEntropy, softmaxCrossEntropy
+export ltwo, crossEntropy, binary_crossEntropy, softmaxCrossEntropy
 
 module ltwo
-using LinearAlgebra
+using LinearAlgebra, Main.Neurons, Main.RNN, Main.GRU, Main.LSTM
 
 evaluate(label,X,output_dim) = 0.5 * dot(label-X[end-output_dim+1:end], label - X[end-output_dim+1:end])
 gradient(label,X,output_dim) = X[end-output_dim+1:end] - label
@@ -47,12 +47,43 @@ function hessian(label,X,output_dim)
 end
 end # end crossEntropy
 
+module binary_crossEntropy
+using LinearAlgebra
+
+"""
+Description:
+    Implements binary cross entropy loss evaluation, gradient and hessian
+"""
+function evaluate(label, X, out)
+    label = label[1]
+    pred = X[end]
+    y = -(label*log(pred) + (1-label)*log(1-pred))
+    return y
+end
+
+function gradient(label, X, out)
+    label = label[1]
+    df = zeros(length(X))
+    pred = X[end]
+    df[end] = (pred - label)/(pred*(1 - pred))
+    return df
+end
+
+function hessian(label, X, out)
+    label = label[1]
+    df2 = zeros(length(X), length(X))
+    pred = X[end]
+    df2[end,end] = label/pred^2 + (1-label)/(1-pred)^2
+    return df2
+end
+end # end binary_crossEntropy
+
 module softmaxCrossEntropy
 using LinearAlgebra, Statistics
 
 """
 Implements softmax crossentropy function, gradient and hessian.
-    - label: y or true label
+    - label: y (true label)
     - X: network architecture vector
     - output_dim: dimension of output
 """
@@ -83,7 +114,6 @@ function hessian(label,X,output_dim)
     S = sum(exp.(z))
     J = reshape(collect(Iterators.flatten(map(i -> -exp.(z[i] .+ z) / S^2, 1:output_dim))), output_dim, output_dim)
     J[diagind(J)] += exp.(z) / S
-
 
     # returns a matrix of dimension: (length(X), length(X))
     outInd = length(X)-length(label)+1:length(X)
@@ -145,7 +175,7 @@ function evaluate(L :: Vector, inp_dim :: Int64, hid_dim :: Int64, seq_length ::
         -norm(λ_star) / (norm(Λ[:,T][i])*(1+log(norm(λ_star)^2))) + 1 :
         # ϕ2
         log(norm(λ_star)*norm(Λ[:,T][i])) / (1+log(norm(λ_star)^2)), 1:d)
-    return 1e-1 * ((sum( nrms.^2)/T - M^2) + sum(ϕ))
+    return 1e-2 * ((sum( nrms.^2)/T - M^2) + sum(ϕ))
 end
 
 function gradient(L :: Vector, inp_dim :: Int64, hid_dim :: Int64, seq_length :: Int64, ntwk_type :: String)
@@ -173,7 +203,7 @@ function gradient(L :: Vector, inp_dim :: Int64, hid_dim :: Int64, seq_length ::
     # append vector to adjoint vector
     grad = zeros(length(L))
     grad[X_pos] = collect(Iterators.flatten(val))
-    return 1e-1 * grad
+    return 1e-2 * grad
 end
 
 end #end var_phi module

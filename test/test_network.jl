@@ -1,6 +1,9 @@
 include("../src/neurons.jl")
 include("../src/network.jl")
 include("../src/partition.jl")
+include("../src/rnn.jl")
+include("../src/lstm.jl")
+include("../src/gru.jl")
 include("../src/penalties.jl")
 
 

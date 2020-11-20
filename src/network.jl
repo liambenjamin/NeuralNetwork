@@ -1,4 +1,4 @@
-#Author: Vivak Patel
+#Author: Vivak Patel & Liam Johnston
 #Date: April 25, 2019
 #Description: Implements and verifies general feed forward network structure
 
@@ -6,7 +6,7 @@ module Network
 
 using LinearAlgebra, SparseArrays, Main.Neurons
 
-export paramGrad, update!, adam_update!
+export paramGrad, inputGrad, update!
 
 
 mutable struct network
@@ -96,7 +96,7 @@ end
 """
 Verifies graph structure is feed forward.
 """
-function verify(ntwk)
+function verify(ntwk :: network)
     L = length(ntwk.neurons)
     num_out = ntwk.results
     failed = falses(L)
@@ -114,7 +114,7 @@ end
 """
 Adds and verifies given graph structure to given network.
 """
-function graph!(ntwk, graph :: SparseMatrixCSC)
+function graph!(ntwk :: network, graph :: SparseMatrixCSC)
     num_out = ntwk.results
     L = length(ntwk.neurons)
     nX = length(ntwk.X2neur)
@@ -140,7 +140,7 @@ end
 """
 Evaluates network for given feature
 """
-function evaluate(ntwk, feat)
+function evaluate(ntwk :: network, feat)
     #Verify feature dimension
     length(feat) != ntwk.features && @error "Feature vector dimension does not correspond to network structure."
 
@@ -166,7 +166,7 @@ end
 """
 Computes the adjoint variables
 """
-function adjoint(ntwk, X :: Vector{Float64}, df :: Function)
+function adjoint(ntwk :: network, X :: Vector{Float64}, df :: Function)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -190,7 +190,7 @@ function adjoint(ntwk, X :: Vector{Float64}, df :: Function)
     return λ
 end
 
-function adjoint(ntwk, X :: Vector{Float64}, label :: Vector{Float64}, loss :: Module)
+function adjoint(ntwk :: network, X :: Vector{Float64}, label :: Vector{Float64}, loss :: Module)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -217,7 +217,7 @@ end
 """
 Computes the forward coadjoint variables
 """
-function coadjoint_forward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, penalty :: Module)
+function coadjoint_forward(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64}, penalty :: Module)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -249,7 +249,7 @@ function coadjoint_forward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, pe
 
     return γ
 end
-function coadjoint_forward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, penalty :: Module, ntwk_type :: String)
+function coadjoint_forward(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64}, penalty :: Module, ntwk_type :: String)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -282,7 +282,7 @@ function coadjoint_forward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, pe
     return γ
 end
 
-function coadjoint_forward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, dg :: Function)
+function coadjoint_forward(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64}, dg :: Function)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -313,7 +313,7 @@ end
 """
 Computes the backward coadjoint variables
 """
-function coadjoint_backward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, γ :: Vector{Float64}, df :: Function, d2f :: Function)
+function coadjoint_backward(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64}, γ :: Vector{Float64}, df :: Function, d2f :: Function)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -340,7 +340,7 @@ function coadjoint_backward(ntwk, X :: Vector{Float64}, λ :: Vector{Float64}, �
 
     return α
 end
-function coadjoint_backward(ntwk, X :: Vector{Float64}, label :: Vector{Float64}, λ :: Vector{Float64}, γ :: Vector{Float64}, loss :: Module)
+function coadjoint_backward(ntwk :: network, X :: Vector{Float64}, label :: Vector{Float64}, λ :: Vector{Float64}, γ :: Vector{Float64}, loss :: Module)
     L = length(ntwk.neurons)
     mX = length(X)
 
@@ -369,7 +369,7 @@ function coadjoint_backward(ntwk, X :: Vector{Float64}, label :: Vector{Float64}
 end
 
 """
-Computes gradient using adjoint or coadjoint depending on number of arguments.
+Computes gradient with respect to the parameters using adjoint or coadjoint depending on number of arguments.
 """
 function paramGrad(df :: Function, ntwk :: network, feat :: Vector{Float64})
     X = evaluate(ntwk, feat)
@@ -384,14 +384,14 @@ end
 function paramGrad(loss :: Module, penalty :: Module, ntwk :: network, feat :: Vector{Float64}, label :: Vector{Float64},ntwk_type :: String)
     X = evaluate(ntwk, feat)
     λ = adjoint(ntwk, X, label, loss)
-    γ = coadjoint_forward(ntwk, X, λ, penalty,ntwk_type)
+    γ = coadjoint_forward(ntwk, X, λ, penalty, ntwk_type)
     α = coadjoint_backward(ntwk, X, label, λ, γ, loss)
     return paramGrad(ntwk, X, λ, γ, α)
 end
-function paramGrad(loss :: Module, penalty :: Function, ntwk :: network, feat :: Vector{Float64}, label :: Vector{Float64}, ntwk_type :: String)
+function paramGrad(loss :: Module, g :: Function, ntwk :: network, feat :: Vector{Float64}, label :: Vector{Float64}, ntwk_type :: String)
     X = evaluate(ntwk, feat)
     λ = adjoint(ntwk, X, label, loss)
-    γ = coadjoint_forward(ntwk, X, λ, penalty, ntwk_type)
+    γ = coadjoint_forward(ntwk, X, λ, g, ntwk_type)
     α = coadjoint_backward(ntwk, X, label, λ, γ, loss)
     return paramGrad(ntwk, X, λ, γ, α)
 end
@@ -444,6 +444,70 @@ function paramGrad(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64},
 end
 
 """
+Computes gradient with respect to the input using adjoint or coadjoint depending on number of arguments.
+"""
+function inputGrad(df :: Function, ntwk :: network, feat :: Vector{Float64})
+    X = evaluate(ntwk, feat)
+    λ = adjoint(ntwk, X, df)
+    return inputGrad(ntwk, X, λ)
+end
+function inputGrad(loss :: Module, ntwk :: network, feat :: Vector{Float64}, label :: Vector{Float64})
+    X = evaluate(ntwk, feat)
+    λ = adjoint(ntwk, X, label, loss)
+    return inputGrad(ntwk, X, λ)
+end
+function inputGrad(loss :: Module, penalty :: Module, ntwk :: network, feat :: Vector{Float64}, label :: Vector{Float64}, ntwk_type :: String)
+    X = evaluate(ntwk, feat)
+    λ = adjoint(ntwk, X, label, loss)
+    γ = coadjoint_forward(ntwk, X, λ, penalty, ntwk_type)
+    α = coadjoint_backward(ntwk, X, label, λ, γ, loss)
+    return inputGrad(ntwk, X, λ, γ, α)
+end
+function inputGrad(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64})
+    L = length(ntwk.neurons)
+    function getGrad(k)
+        outIndx = ntwk.neur2X[k]
+        inIndx = ntwk.n2indX[k]
+        mdl, β, met = ntwk.neurons[k].mod, ntwk.neurons[k].β, ntwk.neurons[k].met
+        # derivative w.r.t. input
+        output = eval(mdl).dX(X[inIndx], β; met = met)
+        λₖ = λ[outIndx]
+        if ntwk.neurons[k].mod == :softmax
+            return [-transpose(output)*λₖ]
+        else
+            return ntwk.neurons[k].out == 1 ? -λₖ[1]*output : -transpose(output)*λₖ
+        end
+    end
+    return Dict{Int64,Vector{Float64}}(map(k -> (k => getGrad(k)), 1:L))
+end
+function inputGrad(ntwk :: network, X :: Vector{Float64}, λ :: Vector{Float64}, γ :: Vector{Float64}, α :: Vector{Float64})
+    L = length(ntwk.neurons)
+    function getGrad(k)
+        if ntwk.neurons[k].mod == :softmax
+            return [0.0]
+        else
+            outIndx = ntwk.neur2X[k]
+            inIndx = ntwk.n2indX[k]
+            mdl, β, met = ntwk.neurons[k].mod, ntwk.neurons[k].β, ntwk.neurons[k].met
+            # derivative w.r.t. input
+            derPar = eval(mdl).dX(X[inIndx], β; met = met)
+            αₖ = α[outIndx]
+            t = ntwk.neurons[k].out
+            term1 = t == 1 ? -αₖ[1]*derPar : -transpose(derPar)*αₖ
+
+            derMix = eval(mdl).dXX(X[inIndx],β; met = met)
+            λₖ = λ[outIndx]
+            γₖ = γ[inIndx]
+            term2 = t == 1 ? -λₖ[1]*(derMix'*γₖ) : -sum(map(j -> λₖ[j]*( derMix[j]'*γₖ) ,1:t))
+
+            return term1 + term2
+        end
+    end
+    return Dict{Int64,Vector{Float64}}(map(k -> (k => getGrad(k)), 1:L))
+end
+
+
+"""
 Update network parameters by parameter gradient with given stepsize
 """
 function update!(df :: Function, ntwk :: network, feat :: Vector{Float64}, step :: Float64)
@@ -493,28 +557,6 @@ function update!(ntwk :: network, grads :: Dict, step :: Float64)
     end
     nothing
 end
-
-#=
-"""
-ADAM Update
-"""
-function adam_update!(loss :: Module, penalty :: Module, ntwk :: network, feat :: Vector{Float64}, label :: Vector{Float64}, step :: Float64, m :: Vector{Float64}, v :: Vector{Float64}, iter :: Int64)
-    β1 = 0.9
-    β2 = 0.99
-    L = length(ntwk.neurons)
-    grads = paramGrad(loss, penalty, ntwk, feat, label)
-
-    for i = 1:L
-        m_i = β1 * m[i] + (1 - β1) * grads[i]
-        v_i = β2 * v[i] + (1 - β2) * grads[i].^2
-        m_hat = m_i / (1 - β1^iter)
-        v_hat = v_i / (1 - β2^iter)
-        ntwk.neurons[i].β -= step * m_hat / (sqrt(v_hat) + 1e-10) # ϵ=1e-10
-        #ntwk.neurons[i].β -= step * grads[i]
-    end
-    return m, v
-end
-=#
 
 
 end #End Module

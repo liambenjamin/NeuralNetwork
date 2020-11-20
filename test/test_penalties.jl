@@ -6,7 +6,7 @@ include("../src/penalties.jl")
 
 using LinearAlgebra, Main.loss, Main.penalty, Main.RNN
 
-loss_list = [:ltwo, :crossEntropy, :softmaxCrossEntropy]
+loss_list = [:ltwo, :crossEntropy, :binary_crossEntropy, :softmaxCrossEntropy]
 
 
 printstyled("\n\n**************\nTesting Losses\n**************\n\n",color=:magenta)
@@ -15,6 +15,10 @@ for ls in loss_list
     #label = [0.01, 0.01, 1.01, 0.01, 0.01]
     label = [0, 0, 1, 0, 0]
     pred = [0.1,0.1,0.6,0.1,0.1]
+    if ls == :binary_crossEntropy
+        label = 0
+        pred = [0.1]
+    end
     ϵ = 1e-8
     bse_f = eval(ls).evaluate(label,pred,length(label))
     bse_g = eval(ls).gradient(label,pred,length(label))

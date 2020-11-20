@@ -74,7 +74,9 @@ function rnnNeurons(feat_dim, hid_dim, seq_length, output_dim, seed; kwargs...)
 	end
 	#neurons[id:end] = map(i -> sigmoid.init(i, hid_dim, hid_dim+1), id:length(neurons))
 	# linear activation b/t Xτ and output
-	neurons[id:end] = map(i -> linear.init(i, hid_dim, hid_dim+1), id:length(neurons))
+	output_dim > 1 ?
+		neurons[id:end] = map(i -> linear.init(i, hid_dim, hid_dim+1), id:length(neurons)) :
+		neurons[id:end] = map(i -> sigmoid.init(i, hid_dim, hid_dim+1), id:length(neurons))
 
     return neurons
 end

@@ -1,11 +1,10 @@
 % Set directory to file location
-
-filename = 'alpha_beta_21.csv';
+filename = 'a.csv';
 coords = csvread(filename, 1, 0);
 x = coords(:,1);
 y = coords(:,2);
-J1 = csvread('simplexF21_4_1.csv');
-J2 = csvread('simplexF21_4_2.csv');
+J1 = csvread('mnist/JE_train_1e2.csv');
+J2 = csvread('mnist/JE_test_1e2.csv');
 
 
 x_vec = zeros(length(x)*length(y),1);
@@ -25,8 +24,8 @@ for i=1:length(x)
 end
       
 % interpolation grid
-xq = 0:0.02:2.0;
-yq = 0.:0.02:2.0;
+xq = 0:0.02:1.2;
+yq = 0.:0.02:1.2;
 
 % unstack
 x_new = zeros(length(xq)*length(yq),1);
@@ -72,7 +71,7 @@ plot3(0, 1, J1(51,1),'.r','markersize',25); %adjoint
 text(0,0,J1(1,1)-0.02,'Init');
 text(1,0,J1(1,51)-0.02,'Coadjoint');
 text(0,1,J1(51,1)-0.02,'Adjoint');
-title("Loss Surface Interpolation over 2-Simplex");
+title("Train Loss Surface Interpolation over 2-Simplex");
 xlabel("\alpha");
 set(get(gca,'zlabel'),'rotation',0)
 ylabel("\beta");
@@ -95,7 +94,7 @@ plot3(0, 1, J2(51,1),'.r','markersize',25); %adjoint
 text(0,0,J2(1,1)-0.02,'Init');
 text(1,0,J2(1,51)-0.02,'Coadjoint');
 text(0,1,J2(51,1)-0.02,'Adjoint');
-title("Loss Surface Interpolation over 2-Simplex");
+title("Test Loss Surface Interpolation over 2-Simplex");
 xlabel("\alpha");
 set(get(gca,'zlabel'),'rotation',0)
 ylabel("\beta");
