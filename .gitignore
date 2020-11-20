@@ -1,3 +1,4 @@
 data/
 adjoint-coadjoint.pdf
 analysis/scratch.jl
+.DS_Store
