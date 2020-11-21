@@ -12,14 +12,14 @@ using FileIO, CSV, DataFrames, Statistics, MultivariateStats, LinearAlgebra, Spa
 
 # load network, loss and penalty
 printstyled("Loading Network:", color=:yellow)
-ntwk = load("mnist3/rnn_adjoint_1.jld2", "ntwk")
+ntwk = load("mnist3/rnn_coadjoint_1e2_5.jld2", "ntwk")
 lsmod = loss.softmaxCrossEntropy
 pnmod = penalty.var_phi
 partition = load("mnist3/rnn_partition.jld2", "partition")
 printstyled("\t\t\tCOMPLETE\n", color=:yellow)
 
 
-printstyled("Loading Data:", color=:yellow)
+printstyled("Loading Data:\n", color=:yellow)
 test_x, test_y = Helpers.load_mnist_test()
 #=
 N=1500
@@ -81,9 +81,10 @@ function perturb_test(ntwk :: Network.network, loss :: Module, penalty :: Module
     # package and save
     org = DataFrame(F=org_F, G=org_G, E=org_error)
     pert = DataFrame(F=pert_F, G=pert_G, E=pert_error)
-    f = string("../analysis/adjoint/mnist_$(ntwk_type)_$(name)_.jld2")
-    save(f, "partition", partition)
-
+    f_org = string("../analysis/adjoint/mnist_rnn_$(method)_1e2_org_u$(pos)_$(name)_.jld2")
+    f_pert = string("../analysis/adjoint/mnist_rnn_$(method)_1e2_pert_u$(pos)_$(name)_.jld2")
+    save(f_org, "output", org)
+    save(f_pert, "output", pert)
     printstyled("\tOriginal Err:\t$(org_error)\n",color=:cyan)
     printstyled("\tOriginal F:\t$(org_F)\n",color=:cyan)
     printstyled("\tOriginal G:\t$(org_G)\n\n",color=:cyan)
@@ -93,16 +94,23 @@ function perturb_test(ntwk :: Network.network, loss :: Module, penalty :: Module
     printstyled("\tPerturbed G:\t$(pert_G)\n\n",color=:cyan)
 end
 
+pos = 1
 printstyled("Starting Testing:\n",color=:yellow)
-perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "adjoint", 1, 1e-5, "p1e5")
+perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "coadjoint", pos, 5e-5, "p1e5")
 printstyled("\tTest 1 Complete\n",color=:yellow)
-perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "adjoint", 1, 1e-4, "p1e4")
+perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "coadjoint", pos, 5e-4, "p1e4")
 printstyled("\tTest 2 Complete\n",color=:yellow)
-perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "adjoint", 1, 1e-3, "p1e3")
+perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "coadjoint", pos, 5e-3, "p1e3")
 printstyled("\tTest 3 Complete\n",color=:yellow)
-perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "adjoint", 1, 1e-2, "p1e2")
+perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "coadjoint", pos, 5e-2, "p1e2")
 printstyled("\tTest 4 Complete\n",color=:yellow)
-perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "adjoint", 1, 1e-1, "p1e1")
+perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "coadjoint", pos, 5e-1, "p1e1")
 printstyled("\tTest 5 Complete\n",color=:yellow)
-perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "adjoint", 1, 1e0, "p1e0")
+perturb_test(ntwk, lsmod, pnmod, 1500, test_x, test_y, partition, "coadjoint", pos, 5e0, "p1e0")
 printstyled("\tTest 6 Complete\n",color=:yellow)
+
+
+# Plotting
+#ntwk = load("mnist3/rnn_adjoint_1.jld2", "ntwk")
+
+#f = load("../analysis/adjoint/mnist_rnn_u7_1e0_.jld2", )
