@@ -147,7 +147,13 @@ end
 
 
 """
-Load MNIST test set
+Description:
+	Load and returns flattened features and one-hot labels for the MNIST dataset
+Dependencies:
+	MLDatasets
+Returns:
+	test_x : [num_samples] [784,]
+	test_y : [num_samples, output_dim]
 """
 function load_mnist_test()
 	# load MNIST data
@@ -731,9 +737,9 @@ Description:
 Dependencies:
 	MultivariateStats
 """
-function principal_direction(G :: Array{Float64,2})
+function principal_direction(G :: Array{Float64,2}, k :: Int64)
 	P = fit(PCA, G, method=:cov)
-	d = projection(P)[:,1]
+	d = projection(P)[:,k]
 	return d
 end
 """
@@ -777,6 +783,21 @@ function perturb_dataset(features, pos :: Int64, d :: Array{Float64,1}, seq_leng
 	end
 	(length(U_pert) != length(features)) && @error "Perturbed and original dataset dimensions do not match"
 	return U_pert
+end
+
+function perturb_images(ntwk :: Network.network, loss :: Module, penalty :: Module, N :: Integer, feats, labels, partition :: Vector{Vector{Int64}}, method :: String, pos :: Int64, ϵ :: Float64)
+    x, y = feats[1:N], labels[1:N,:]
+    grad = Helpers.input_element_grad(ntwk, loss, penalty, x, y, partition, method, "rnn", pos)
+    dir = Helpers.principal_direction(grad)
+    pert_x = Helpers.perturb_dataset(feats, pos, dir, ntwk.seq_length, ϵ)
+
+	img = []
+	img_p = []
+	for i=1:length(pert_x)
+		push!(img, MNIST.convert2image(feats[i]))
+		push!(img_p, MNIST.convert2image(pert_x[i]))
+	end
+	return img, img_p
 end
 
 """
