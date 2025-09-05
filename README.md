@@ -1,3 +1,3 @@
 # NeuralNetwork
 
-A repository for constructing and training arbitrary neural network architectures.
+A repository for implementing and verifying a general neural network. Includes specification of architecture connectivity (forward pass) and calculating gradient updates (backpropagation).
